@@ -1,0 +1,16 @@
+# ANGELS95 game data (large, fetched from angels-95-omega-tech upstream)
+angels95-test-server/GameData/
+
+# Secrets and env
+.env
+.env.*
+
+# TLS / SSL certificates
+certs/
+*.pem
+*.key
+*.crt
+
+# Logs and temp
+logs/
+*.log

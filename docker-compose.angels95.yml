@@ -1,0 +1,111 @@
+# ANGELS95 master server + dedicated test-server hosting stack.
+# Self-contained slice of the TribeWarez proxy-vps compose, for the
+# AngelMaster listing server and the per-gamemode AngelServ servers.
+#
+# Services:
+#   angels95-master-api   AngelMaster listing server (UDP 27900 + HTTP 27950)
+#   angels95-test-server  plain co-op dedicated server (UDP 27015 + HTTP 8080)
+#   angels95-test-coop    COOP campaign arc --campaign (UDP 27016 + HTTP 8081)
+#   angels95-test-dm      Deathmatch (Dust_Ravine authored ETHERAL_MATCH; 27017/8082)
+#   angels95-test-tdm     Team Deathmatch (Dust_Ravine authored ANGEL_TEAM_GAME; 27018/8083)
+#
+# Dedicated servers use host networking so heartbeats hit the master from the
+# public eth0 IP (the master's anti-spoof rule ignores a self-reported
+# --public-ip from a private source).
+
+services:
+  angels95-master-api:
+    build: ./angels95-master-api
+    image: angels95-master-api:latest
+    container_name: angels95-master-api
+    ports:
+      - "27900:27900/udp"
+      - "27950:27950"
+    command: ["--port", "27900", "--http-port", "27950", "--bind", "0.0.0.0"]
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 64M
+    restart: unless-stopped
+
+  angels95-test-server:
+    build: ./angels95-test-server
+    image: angels95-test-server:latest
+    container_name: angels95-test-server
+    network_mode: host
+    depends_on:
+      - angels95-master-api
+    command: ["--port", "27015", "--http-port", "8080", "--dir", "/app/GameData",
+              "--server-name", "TribeWarez Official Test Server",
+              "--master", "159.195.10.230:27900",
+              "--master-http", "http://159.195.10.230:27950",
+              "--public-ip", "159.195.10.230"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+
+  angels95-test-coop:
+    build: ./angels95-test-server
+    image: angels95-test-server:latest
+    container_name: angels95-test-coop
+    network_mode: host
+    depends_on:
+      - angels95-master-api
+    command: ["--port", "27016", "--http-port", "8081", "--dir", "/app/GameData",
+              "--server-name", "TribeWarez COOP Test Server",
+              "--campaign",
+              "--master", "159.195.10.230:27900",
+              "--master-http", "http://159.195.10.230:27950",
+              "--public-ip", "159.195.10.230"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+
+  angels95-test-dm:
+    build: ./angels95-test-server
+    image: angels95-test-server:latest
+    container_name: angels95-test-dm
+    network_mode: host
+    depends_on:
+      - angels95-master-api
+    volumes:
+      - ./angels95-test-server/mode-worlds/dm/Worlds:/app/GameData/Worlds:ro
+    command: ["--port", "27017", "--http-port", "8082", "--dir", "/app/GameData",
+              "--server-name", "TribeWarez Deathmatch Test Server",
+              "--master", "159.195.10.230:27900",
+              "--master-http", "http://159.195.10.230:27950",
+              "--public-ip", "159.195.10.230"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
+
+  angels95-test-tdm:
+    build: ./angels95-test-server
+    image: angels95-test-server:latest
+    container_name: angels95-test-tdm
+    network_mode: host
+    depends_on:
+      - angels95-master-api
+    volumes:
+      - ./angels95-test-server/mode-worlds/tdm/Worlds:/app/GameData/Worlds:ro
+    command: ["--port", "27018", "--http-port", "8083", "--dir", "/app/GameData",
+              "--server-name", "TribeWarez Team Deathmatch Test Server",
+              "--master", "159.195.10.230:27900",
+              "--master-http", "http://159.195.10.230:27950",
+              "--public-ip", "159.195.10.230"]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    restart: unless-stopped
