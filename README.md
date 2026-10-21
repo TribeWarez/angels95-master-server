@@ -18,27 +18,33 @@ The `AngelMaster` / `AngelServ` binaries are fetched at build time from the upst
 
 AngelServ has no per-mode CLI flag except `--campaign`; Deathmatch / TDM are driven by the **world's `levelinfo`** line in `World.ozone`. This repo ships authored mode worlds under `angels95-test-server/mode-worlds/` — Dust_Ravine copies with `levelinfo 2` (Deathmatch) and `levelinfo 3` (Team Deathmatch), `friendlyFire` on — bind-mounted over `/app/GameData/Worlds` per server so each dedicated server loads exactly one deterministic world.
 
-`--campaign` requires **b95 or newer**; b94's argument parser silently ignores
-unknown flags, so the COOP service is plain co-op on the default tag. Even on
-b97+, `Dessert_Dreams` is not a mission world, so the arc seeds nothing; point
-that service's `--dir` at a `Sektor_*` mission world to exercise it.
+`--campaign` was added in b95; **b99 is the first complete release** that
+contains it. b94's argument parser silently ignores unknown flags, so on the
+old tag the COOP service is plain co-op. Even on b99+, `Dessert_Dreams` is not
+a mission world, so the arc seeds nothing; point that service's `--dir` at a
+`Sektor_*` mission world to exercise it.
 
 ## Versioning and the release pipeline
 
-The images fetch the `ANGELS95_TAG` build arg (default `b94`). From **b97** the
+The images fetch the `ANGELS95_TAG` build arg (default **`b99`**). From b99 the
 release tag is stamped into the binary (`Source/Version.hpp`), exposed by
 `AngelServ --version`, reported as `gamever` in the heartbeat and `/status`,
 and the wire-compatibility id is reported separately as `proto`
 (`net::PROTOCOL_VERSION`). Older builds all claim `0.2.1` / `build b58`.
 
-`scripts/angels95-update.sh` polls **`releases/latest`**, not tags. b95 and b96
-exist as git tags but have **no GitHub Release** because the CI `make test`
-step fails on those tags, so the updater correctly stays on b94. To move the
-fleet: fix the Linux `make test` job, tag b97, confirm
-`https://api.github.com/repos/TribeWarez/Angels-95/releases/tags/b97`, then let
-the cron updater run. A plain master rebuild does not fix the listing: the b94
-master's per-source-IP limiter is in `Master.cpp` and must be replaced by the
-b97 per-`(ip,port)` limiter.
+`scripts/angels95-update.sh` polls **`releases/latest`**, not tags. The history
+matters for anyone reading an old list:
+
+- b95/b96/b97 are git tags with **no GitHub Release** (CI `make test` failed;
+  the game hierarchy was untracked).
+- b98 has a **Windows-only** release: its Linux job failed at `miniz`
+  (`ftello`/`fseeko` under `-std=c99`).
+- **b99 is the first complete release** (Linux + Windows + `System-b99.zip`),
+  and is `releases/latest`. The updater now has both Linux assets it requires.
+
+A plain master rebuild never fixed the listing: the b94 master's
+per-source-IP limiter is in `Master.cpp` and was replaced by b99's
+per-`(ip,port)` limiter. Verify after the cron runs:
 
 Verify what is actually running:
 
@@ -79,13 +85,13 @@ checks the running image label after recreating. Run it from cron:
 - **b94 master:** rate-limits heartbeats to 1 per 1.5s per **source IP**, so
   several servers behind one public IP cannot all appear in `/api/servers` at
   once. The membership is decided by heartbeat phase drift and can change after
-  a restart. **Fixed in b97** (per-`ip:port` limiter + coarse per-source cap);
-  pin `ANGELS95_TAG` to b97+ once released.
+  a restart. **Fixed in b99** (per-`ip:port` limiter + coarse per-source cap);
+  b99 is pinned by default.
 - **b94 `AngelServ`:** self-reports `0.2.1` / `build b58` and has no
-  `--campaign`. b97 stamps the release tag into `gamever` and exposes it via
+  `--campaign`. b99 stamps the release tag into `gamever` and exposes it via
   `--version`; the wire id is reported separately as `proto`.
 - **TDM:** b94 has no team-aware friendly-fire gate (`friendlyFire=1` is
   all-vs-all, and a team kill is awarded to the killer's team). **Fixed in
-  b97** (enemy-only friendly fire, no team-kill score).
+  b99** (enemy-only friendly fire, no team-kill score).
 - The advertised `max_players` on b94 is 32 even though the shipped worlds
-  author 8; b97 reports the world's cap and rejects the 9th joiner cleanly.
+  author 8; b99 reports the world's cap and rejects the 9th joiner cleanly.
