@@ -1,6 +1,6 @@
 # ANGELS95 — Master Server & Dedicated Server Hosting
 
-Dedicated hosting infrastructure for [ANGELS95](https://github.com/odelyzid/angels-95-omega-tech) by TribeWarez: the `AngelMaster` listing server plus per-gamemode `AngelServ` dedicated test servers.
+Dedicated hosting infrastructure for [ANGELS95](https://github.com/TribeWarez/Angels-95) by TribeWarez: the `AngelMaster` listing server plus per-gamemode `AngelServ` dedicated test servers.
 
 ## Components
 
@@ -18,6 +18,36 @@ The `AngelMaster` / `AngelServ` binaries are fetched at build time from the upst
 
 AngelServ has no per-mode CLI flag except `--campaign`; Deathmatch / TDM are driven by the **world's `levelinfo`** line in `World.ozone`. This repo ships authored mode worlds under `angels95-test-server/mode-worlds/` — Dust_Ravine copies with `levelinfo 2` (Deathmatch) and `levelinfo 3` (Team Deathmatch), `friendlyFire` on — bind-mounted over `/app/GameData/Worlds` per server so each dedicated server loads exactly one deterministic world.
 
+`--campaign` requires **b95 or newer**; b94's argument parser silently ignores
+unknown flags, so the COOP service is plain co-op on the default tag. Even on
+b97+, `Dessert_Dreams` is not a mission world, so the arc seeds nothing; point
+that service's `--dir` at a `Sektor_*` mission world to exercise it.
+
+## Versioning and the release pipeline
+
+The images fetch the `ANGELS95_TAG` build arg (default `b94`). From **b97** the
+release tag is stamped into the binary (`Source/Version.hpp`), exposed by
+`AngelServ --version`, reported as `gamever` in the heartbeat and `/status`,
+and the wire-compatibility id is reported separately as `proto`
+(`net::PROTOCOL_VERSION`). Older builds all claim `0.2.1` / `build b58`.
+
+`scripts/angels95-update.sh` polls **`releases/latest`**, not tags. b95 and b96
+exist as git tags but have **no GitHub Release** because the CI `make test`
+step fails on those tags, so the updater correctly stays on b94. To move the
+fleet: fix the Linux `make test` job, tag b97, confirm
+`https://api.github.com/repos/TribeWarez/Angels-95/releases/tags/b97`, then let
+the cron updater run. A plain master rebuild does not fix the listing: the b94
+master's per-source-IP limiter is in `Master.cpp` and must be replaced by the
+b97 per-`(ip,port)` limiter.
+
+Verify what is actually running:
+
+```bash
+docker exec angels95-test-server /usr/local/bin/AngelServ --version
+curl -s http://127.0.0.1:8080/status | python3 -m json.tool   # gamever, proto, max_players
+docker inspect --format '{{ index .Config.Labels "org.opencontainers.image.version" }}' angels95-test-server
+```
+
 ## Run
 
 ```bash
@@ -25,11 +55,20 @@ docker compose -f docker-compose.angels95.yml build
 docker compose -f docker-compose.angels95.yml up -d
 ```
 
-All dedicated servers use `network_mode: host` so master heartbeats originate from the public interface (the master's anti-spoof rule ignores a self-reported `--public-ip` from a private source). Point the master target at the VPS public IP (`--master` / `--master-http` / `--public-ip`).
+`angels95-test-server/GameData/` is **gitignored** (large) and `COPY`ed into the
+image at build time. A fresh clone cannot build until you populate it from the
+game repo or the `System-<tag>.zip`; the updater refuses to advance without it
+rather than baking stale content.
+
+All dedicated servers use `network_mode: host` so master heartbeats originate from the public interface. The master trusts a self-reported `--public-ip` only from a private source (LAN / local proxy); a public source is listed at its observed address. Point the master target at the VPS public IP (`--master` / `--master-http` / `--public-ip`).
 
 ## Auto-update
 
-`scripts/angels95-update.sh` polls the upstream `angels-95-omega-tech` releases and rebuilds/recreates the master + dedicated servers when a new tag is published. Run it from cron:
+`scripts/angels95-update.sh` polls the canonical `TribeWarez/Angels-95` releases
+and rebuilds/recreates the master + dedicated servers when a new release is
+published. It verifies both Linux assets exist, refuses to run without
+`GameData`, never advances its state file on a failed build/recreate, and
+checks the running image label after recreating. Run it from cron:
 
 ```bash
 */5 * * * * /path/to/angels95-master-server/scripts/angels95-update.sh
@@ -37,6 +76,16 @@ All dedicated servers use `network_mode: host` so master heartbeats originate fr
 
 ## Known limits (upstream)
 
-- AngelMaster rate-limits heartbeats to 1 per 1.5s per source IP, so multiple servers behind one public IP may not all appear in `/api/servers` at once.
-- The `AngelServ` binary self-reports a stale build string (`b58`); the release tag is authoritative.
-- TDM has no team-aware friendly-fire gate yet (`friendlyFire=1` is treated as all-vs-all).
+- **b94 master:** rate-limits heartbeats to 1 per 1.5s per **source IP**, so
+  several servers behind one public IP cannot all appear in `/api/servers` at
+  once. The membership is decided by heartbeat phase drift and can change after
+  a restart. **Fixed in b97** (per-`ip:port` limiter + coarse per-source cap);
+  pin `ANGELS95_TAG` to b97+ once released.
+- **b94 `AngelServ`:** self-reports `0.2.1` / `build b58` and has no
+  `--campaign`. b97 stamps the release tag into `gamever` and exposes it via
+  `--version`; the wire id is reported separately as `proto`.
+- **TDM:** b94 has no team-aware friendly-fire gate (`friendlyFire=1` is
+  all-vs-all, and a team kill is awarded to the killer's team). **Fixed in
+  b97** (enemy-only friendly fire, no team-kill score).
+- The advertised `max_players` on b94 is 32 even though the shipped worlds
+  author 8; b97 reports the world's cap and rejects the 9th joiner cleanly.

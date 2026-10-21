@@ -10,8 +10,11 @@
 #   angels95-test-tdm     Team Deathmatch (Dust_Ravine authored ANGEL_TEAM_GAME; 27018/8083)
 #
 # Dedicated servers use host networking so heartbeats hit the master from the
-# public eth0 IP (the master's anti-spoof rule ignores a self-reported
-# --public-ip from a private source).
+# public eth0 IP. NOTE: the b94 master throttles per SOURCE IP (1/1.5s), so four
+# servers on this host cannot all stay listed. The b97 master keys the limiter
+# on the announced ip:port (+ a coarse per-source cap) and stamps its build id
+# into --version / gamever / proto. Pin ANGELS95_TAG to a b97+ release once one
+# exists; do not expect all four listings before then.
 
 services:
   angels95-master-api:
@@ -55,6 +58,9 @@ services:
     network_mode: host
     depends_on:
       - angels95-master-api
+    # --campaign requires b95+ (b94 silently ignores unknown flags). Even on
+    # b97+ this world (Dessert_Dreams) is not a mission world, so no
+    # objectives seed; point --dir at a Sektor_* mission world to test the arc.
     command: ["--port", "27016", "--http-port", "8081", "--dir", "/app/GameData",
               "--server-name", "TribeWarez COOP Test Server",
               "--campaign",
