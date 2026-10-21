@@ -4,10 +4,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
     && rm -rf /var/lib/apt/lists/* \
     && useradd -r -s /usr/sbin/nologin angels
 
-# Release tag. b99+ stamps this into the binary (Source/Version.hpp) and fixes
+# Release tag. b100+ stamps this into the binary (Source/Version.hpp) and fixes
 # the master-side heartbeat limiter. b94's `--campaign` does not exist yet, so
 # the COOP service below silently runs plain co-op on this tag.
-ARG ANGELS95_TAG=b99
+ARG ANGELS95_TAG=b100
 # Canonical repo (the old odelyzid/... path only redirects).
 ARG ANGELSERV_URL=https://github.com/TribeWarez/Angels-95/releases/download/${ANGELS95_TAG}/AngelServ-${ANGELS95_TAG}-linux-x86_64
 RUN curl -fsSL -o /usr/local/bin/AngelServ "$ANGELSERV_URL" \

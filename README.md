@@ -18,15 +18,15 @@ The `AngelMaster` / `AngelServ` binaries are fetched at build time from the upst
 
 AngelServ has no per-mode CLI flag except `--campaign`; Deathmatch / TDM are driven by the **world's `levelinfo`** line in `World.ozone`. This repo ships authored mode worlds under `angels95-test-server/mode-worlds/` — Dust_Ravine copies with `levelinfo 2` (Deathmatch) and `levelinfo 3` (Team Deathmatch), `friendlyFire` on — bind-mounted over `/app/GameData/Worlds` per server so each dedicated server loads exactly one deterministic world.
 
-`--campaign` was added in b95; **b99 is the first complete release** that
+`--campaign` was added in b95; **b100 is the first complete release** that
 contains it. b94's argument parser silently ignores unknown flags, so on the
-old tag the COOP service is plain co-op. Even on b99+, `Dessert_Dreams` is not
+old tag the COOP service is plain co-op. Even on b100+, `Dessert_Dreams` is not
 a mission world, so the arc seeds nothing; point that service's `--dir` at a
 `Sektor_*` mission world to exercise it.
 
 ## Versioning and the release pipeline
 
-The images fetch the `ANGELS95_TAG` build arg (default **`b99`**). From b99 the
+The images fetch the `ANGELS95_TAG` build arg (default **`b100`**). From b100 the
 release tag is stamped into the binary (`Source/Version.hpp`), exposed by
 `AngelServ --version`, reported as `gamever` in the heartbeat and `/status`,
 and the wire-compatibility id is reported separately as `proto`
@@ -39,11 +39,17 @@ matters for anyone reading an old list:
   the game hierarchy was untracked).
 - b98 has a **Windows-only** release: its Linux job failed at `miniz`
   (`ftello`/`fseeko` under `-std=c99`).
-- **b99 is the first complete release** (Linux + Windows + `System-b99.zip`),
-  and is `releases/latest`. The updater now has both Linux assets it requires.
+- b99 had all assets, but its `AngelServ` was built on the new `ubuntu-latest`
+  (glibc 2.43) and required `GLIBC_2.43` for `sqrtf`/`atan2f`; the
+  `ubuntu:24.04` images (glibc 2.39) killed every game-server container at
+  exec. b99 is **not** safe to deploy.
+- **b100 is the first release that runs in these images**: the Linux runner is
+  pinned to `ubuntu-24.04` and CI fails if either binary requires GLIBC newer
+  than 2.39. It is `releases/latest`, and the updater now has both Linux assets
+  it requires.
 
 A plain master rebuild never fixed the listing: the b94 master's
-per-source-IP limiter is in `Master.cpp` and was replaced by b99's
+per-source-IP limiter is in `Master.cpp` and was replaced by b100's
 per-`(ip,port)` limiter. Verify after the cron runs:
 
 Verify what is actually running:
@@ -85,13 +91,13 @@ checks the running image label after recreating. Run it from cron:
 - **b94 master:** rate-limits heartbeats to 1 per 1.5s per **source IP**, so
   several servers behind one public IP cannot all appear in `/api/servers` at
   once. The membership is decided by heartbeat phase drift and can change after
-  a restart. **Fixed in b99** (per-`ip:port` limiter + coarse per-source cap);
-  b99 is pinned by default.
+  a restart. **Fixed in b100** (per-`ip:port` limiter + coarse per-source cap);
+  b100 is pinned by default.
 - **b94 `AngelServ`:** self-reports `0.2.1` / `build b58` and has no
-  `--campaign`. b99 stamps the release tag into `gamever` and exposes it via
+  `--campaign`. b100 stamps the release tag into `gamever` and exposes it via
   `--version`; the wire id is reported separately as `proto`.
 - **TDM:** b94 has no team-aware friendly-fire gate (`friendlyFire=1` is
   all-vs-all, and a team kill is awarded to the killer's team). **Fixed in
-  b99** (enemy-only friendly fire, no team-kill score).
+  b100** (enemy-only friendly fire, no team-kill score).
 - The advertised `max_players` on b94 is 32 even though the shipped worlds
-  author 8; b99 reports the world's cap and rejects the 9th joiner cleanly.
+  author 8; b100 reports the world's cap and rejects the 9th joiner cleanly.
